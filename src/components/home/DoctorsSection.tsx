@@ -49,7 +49,7 @@ const DoctorsSection: React.FC = () => {
       id: 1,
       name: 'ডা. রফিকুল ইসলাম',
       specialty: 'মেডিসিন বিশেষজ্ঞ',
-      image: 'https://images.pexels.com/photos/5452201/pexels-photo-5452201.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
+      image: 'https://images.pexels.com/photos/19438561/pexels-photo-19438561/free-photo-of-doctor.jpeg',
       degrees: 'এমবিবিএস, এফসিপিএস (মেডিসিন)',
       schedule: 'রবি - বৃহস্পতি, সকাল ১০টা - দুপুর ২টা'
     },
@@ -65,7 +65,7 @@ const DoctorsSection: React.FC = () => {
       id: 3,
       name: 'ডা. আব্দুল্লাহ আল মামুন',
       specialty: 'হৃদরোগ বিশেষজ্ঞ',
-      image: 'https://images.pexels.com/photos/5327585/pexels-photo-5327585.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
+      image: 'https://images.pexels.com/photos/8460094/pexels-photo-8460094.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
       degrees: 'এমবিবিএস, এমডি (কার্ডিওলজি)',
       schedule: 'শনি - বৃহস্পতি, বিকাল ৫টা - রাত ৯টা'
     },
