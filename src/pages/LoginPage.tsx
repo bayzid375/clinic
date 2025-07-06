@@ -1,19 +1,69 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardHeader, CardContent, CardFooter } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { LogIn, User, Lock } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const LoginPage: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { signIn, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [userType, setUserType] = useState('patient');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [success, setSuccess] = useState<string>('');
   
-  const handleSubmit = (e: React.FormEvent) => {
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/patient-portal');
+    }
+  }, [user, navigate]);
+
+  // Show success message if redirected from OTP verification
+  useEffect(() => {
+    if (location.state?.message) {
+      setSuccess(location.state.message);
+      // Clear the state to prevent showing message on refresh
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.state, navigate, location.pathname]);
+  
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle login logic here
-    console.log({ email, password, userType });
-    alert('লগইন সফল হয়েছে!');
+    
+    if (!email.trim() || !password.trim()) {
+      setError('ইমেইল এবং পাসওয়ার্ড প্রয়োজন');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const { error } = await signIn(email, password);
+      
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          setError('ভুল ইমেইল বা পাসওয়ার্ড');
+        } else if (error.message.includes('Email not confirmed')) {
+          setError('আপনার ইমেইল নিশ্চিত করা হয়নি। অনুগ্রহ করে আপনার ইমেইল চেক করুন।');
+        } else {
+          setError('লগইনে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+        }
+      } else {
+        // Successful login - user will be redirected by useEffect
+        console.log('Login successful');
+      }
+    } catch (err) {
+      setError('একটি অপ্রত্যাশিত ত্রুটি ঘটেছে। আবার চেষ্টা করুন।');
+    } finally {
+      setLoading(false);
+    }
   };
   
   useEffect(() => {
@@ -30,29 +80,47 @@ const LoginPage: React.FC = () => {
           </CardHeader>
           
           <CardContent>
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-red-600 text-sm">{error}</p>
+              </div>
+            )}
+
+            {success && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                <p className="text-green-600 text-sm">{success}</p>
+              </div>
+            )}
+            
             <div className="flex justify-center mb-6">
               <div className="inline-flex bg-gray-200 p-1 rounded-md">
                 <button
+                  type="button"
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     userType === 'patient' ? 'bg-white shadow-sm' : 'text-gray-700 hover:bg-gray-100'
                   }`}
                   onClick={() => setUserType('patient')}
+                  disabled={loading}
                 >
                   রোগী
                 </button>
                 <button
+                  type="button"
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     userType === 'doctor' ? 'bg-white shadow-sm' : 'text-gray-700 hover:bg-gray-100'
                   }`}
                   onClick={() => setUserType('doctor')}
+                  disabled={loading}
                 >
                   ডাক্তার
                 </button>
                 <button
+                  type="button"
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     userType === 'admin' ? 'bg-white shadow-sm' : 'text-gray-700 hover:bg-gray-100'
                   }`}
                   onClick={() => setUserType('admin')}
+                  disabled={loading}
                 >
                   অ্যাডমিন
                 </button>
@@ -70,7 +138,11 @@ const LoginPage: React.FC = () => {
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   placeholder="আপনার ইমেইল ঠিকানা"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (error) setError('');
+                  }}
+                  disabled={loading}
                   required
                 />
               </div>
@@ -85,7 +157,11 @@ const LoginPage: React.FC = () => {
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   placeholder="আপনার পাসওয়ার্ড"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (error) setError('');
+                  }}
+                  disabled={loading}
                   required
                 />
               </div>
@@ -96,6 +172,7 @@ const LoginPage: React.FC = () => {
                     type="checkbox" 
                     id="remember" 
                     className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                    disabled={loading}
                   />
                   <label htmlFor="remember" className="ml-2 block text-sm text-gray-700">
                     মনে রাখুন
@@ -110,9 +187,10 @@ const LoginPage: React.FC = () => {
               <Button 
                 type="submit" 
                 fullWidth 
-                icon={<LogIn className="h-5 w-5" />}
+                disabled={loading}
+                icon={loading ? undefined : <LogIn className="h-5 w-5" />}
               >
-                লগইন করুন
+                {loading ? 'লগইন হচ্ছে...' : 'লগইন করুন'}
               </Button>
             </form>
           </CardContent>

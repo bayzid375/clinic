@@ -1,16 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardContent } from '../components/ui/Card';
-import Button from '../components/ui/Button';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardHeader, CardContent } from '../components/ui/Card'; // Assuming you have these
+import Button from '../components/ui/Button'; // Assuming you have this
 import { Calendar, Clock, CreditCard } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 const AppointmentPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { user, refreshSession } = useAuth(); 
+  
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  
+  // State for form steps
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [selectedDoctor, setSelectedDoctor] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
-  const [step, setStep] = useState(1);
-  
-  // Mock departments and doctors
+  const [patientInfo, setPatientInfo] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    age: '',
+    healthIssues: ''
+  });
+  const [selectedPayment, setSelectedPayment] = useState('');
+
+  // Mock data for the form
   const departments = [
     { id: 'medicine', name: 'মেডিসিন' },
     { id: 'cardiology', name: 'হৃদরোগ' },
@@ -20,75 +39,221 @@ const AppointmentPage: React.FC = () => {
     { id: 'pediatrics', name: 'শিশু বিভাগ' },
   ];
   
-  const doctors = {
-    medicine: [
-      { id: 'dr-rafiqul', name: 'ডা. রফিকুল ইসলাম' },
-      { id: 'dr-shamsul', name: 'ডা. শামসুল আলম' },
-    ],
-    cardiology: [
-      { id: 'dr-abdullah', name: 'ডা. আব্দুল্লাহ আল মামুন' },
-      { id: 'dr-mahfuz', name: 'ডা. মাহফুজ রহমান' },
-    ],
-    gynecology: [
-      { id: 'dr-nazmun', name: 'ডা. নাজমুন নাহার' },
-      { id: 'dr-rabeya', name: 'ডা. রাবেয়া খাতুন' },
-    ],
-    neurology: [
-      { id: 'dr-jahangir', name: 'ডা. জাহাঙ্গীর আলম' },
-    ],
-    orthopedics: [
-      { id: 'dr-farid', name: 'ডা. ফরিদ উদ্দিন' },
-    ],
-    pediatrics: [
-      { id: 'dr-farzana', name: 'ডা. ফারজানা আকতার' },
-      { id: 'dr-asif', name: 'ডা. আসিফ ইকবাল' },
-    ],
+  const doctors: Record<string, { id: string, name: string }[]> = {
+    medicine: [ { id: 'dr-rafiqul', name: 'ডা. রফিকুল ইসলাম' }, { id: 'dr-shamsul', name: 'ডা. শামসুল আলম' } ],
+    cardiology: [ { id: 'dr-abdullah', name: 'ডা. আব্দুল্লাহ আল মামুন' }, { id: 'dr-mahfuz', name: 'ডা. মাহফুজ রহমান' } ],
+    gynecology: [ { id: 'dr-nazmun', name: 'ডা. নাজমুন নাহার' }, { id: 'dr-rabeya', name: 'ডা. রাবেয়া খাতুন' } ],
+    neurology: [ { id: 'dr-jahangir', name: 'ডা. জাহাঙ্গীর আলম' } ],
+    orthopedics: [ { id: 'dr-farid', name: 'ডা. ফরিদ উদ্দিন' } ],
+    pediatrics: [ { id: 'dr-farzana', name: 'ডা. ফারজানা আকতার' }, { id: 'dr-asif', name: 'ডা. আসিফ ইকবাল' } ],
   };
   
-  // Available time slots
-  const timeSlots = [
-    '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', 
-    '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM',
-    '04:00 PM', '04:30 PM', '05:00 PM', '05:30 PM',
-    '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM',
-  ];
-  
-  // Payment methods
-  const paymentMethods = [
-    { id: 'bkash', name: 'বিকাশ', image: 'https://i.ibb.co/qk4QdFM/bkash-logo.png' },
-    { id: 'nagad', name: 'নগদ', image: 'https://i.ibb.co/S0cfz1D/nagad-logo.png' },
-    { id: 'rocket', name: 'রকেট', image: 'https://i.ibb.co/C2sCKVn/rocket-logo.png' },
-    { id: 'sslcommerz', name: 'কার্ড পেমেন্ট', image: 'https://i.ibb.co/j4BJb8F/sslcommerz-logo.png' },
-    { id: 'cash', name: 'নগদ টাকা', image: 'https://i.ibb.co/rZ7jMjB/cash-logo.png' },
-  ];
-  
-  const [selectedPayment, setSelectedPayment] = useState('');
-  
+  const timeSlots = [ '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM', '04:00 PM', '04:30 PM', '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM' ];
+  const paymentMethods = [ { id: 'bkash', name: 'বিকাশ', image: 'https://i.ibb.co/qk4QdFM/bkash-logo.png' }, { id: 'nagad', name: 'নগদ', image: 'https://i.ibb.co/S0cfz1D/nagad-logo.png' }, { id: 'rocket', name: 'রকেট', image: 'https://i.ibb.co/C2sCKVn/rocket-logo.png' }, { id: 'sslcommerz', name: 'কার্ড পেমেন্ট', image: 'https://i.ibb.co/j4BJb8F/sslcommerz-logo.png' }, { id: 'cash', name: 'নগদ টাকা', image: 'https://i.ibb.co/rZ7jMjB/cash-logo.png' } ];
+
+  // Redirect user if not logged in and handle visibility changes
+  useEffect(() => {
+    const checkUserIsLoggedIn = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate('/login', { state: { returnTo: '/appointment' } });
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshSession();
+        if (loading) {
+          setLoading(false); // Reset loading state when page becomes visible
+        }
+      }
+    };
+
+    checkUserIsLoggedIn();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [navigate, refreshSession, loading]);
+
   const handleDepartmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const dept = e.target.value;
     setSelectedDepartment(dept);
     setSelectedDoctor('');
   };
-  
-  const handleSubmit = (e: React.FormEvent) => {
+
+  const handlePatientInfoChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setPatientInfo(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('=== Starting appointment submission ===');
+    
     if (step < 3) {
       setStep(step + 1);
-    } else {
-      // Submit appointment
-      alert('আপনার অ্যাপয়েন্টমেন্ট সফলভাবে বুক করা হয়েছে!');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      console.log('Step 1: Checking user authentication...');
+      
+      // Use AuthContext user instead of direct Supabase call
+      if (!user) {
+        console.error('No user found in AuthContext');
+        throw new Error('You are not logged in. Please log in to book an appointment.');
+      }
+      
+      const currentUserId = user.id;
+      console.log('Current user ID:', currentUserId);
+
+      // Validate that all required fields are filled before submitting
+      console.log('Step 2: Validating form data...');
+      const validationErrors = [];
+      
+      if (!selectedDepartment) validationErrors.push('Department');
+      if (!selectedDoctor) validationErrors.push('Doctor');
+      if (!selectedDate) validationErrors.push('Date');
+      if (!selectedTime) validationErrors.push('Time');
+      if (!patientInfo.name) validationErrors.push('Patient Name');
+      if (!patientInfo.phone) validationErrors.push('Phone');
+      if (!patientInfo.age) validationErrors.push('Age');
+      if (!patientInfo.healthIssues) validationErrors.push('Health Issues');
+      if (!selectedPayment) validationErrors.push('Payment Method');
+      
+      if (validationErrors.length > 0) {
+        console.error('Validation errors:', validationErrors);
+        throw new Error(`অনুগ্রহ করে সব তথ্য সঠিকভাবে পূরণ করুন: ${validationErrors.join(', ')}`);
+      }
+      
+      const departmentName = departments.find(d => d.id === selectedDepartment)?.name;
+      if (!departmentName) {
+        throw new Error('বিভাগ খুঁজে পাওয়া যায়নি।');
+      }
+      
+      console.log('Step 3: Building appointment data...');
+      const appointmentData = {
+        patient_id: currentUserId,
+        department: departmentName,
+        doctor_id: selectedDoctor,
+        appointment_date: selectedDate,
+        appointment_time: selectedTime,
+        patient_name: patientInfo.name,
+        patient_phone: patientInfo.phone,
+        patient_email: patientInfo.email || null,
+        patient_age: parseInt(patientInfo.age),
+        health_issues: patientInfo.healthIssues,
+        payment_method: selectedPayment,
+        payment_status: 'pending',
+        appointment_status: 'pending',
+        fee: 500.00,
+      };
+      
+      console.log('Appointment data to submit:', appointmentData);
+
+      console.log('Step 4: Testing Supabase connection...');
+      // Test the connection first with timeout
+      const testPromise = supabase
+        .from('appointments')
+        .select('id')
+        .limit(1);
+      
+      const testTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database connection timeout')), 10000)
+      );
+      
+      const { data: testData, error: testError } = await Promise.race([
+        testPromise,
+        testTimeoutPromise
+      ]) as any;
+      
+      if (testError) {
+        console.error('Supabase connection test failed:', testError);
+        if (testError.code === 'PGRST116') {
+          throw new Error('Appointments table does not exist. Please contact administrator.');
+        } else if (testError.code === '42501') {
+          throw new Error('Permission denied. Please log in again.');
+        } else {
+          throw new Error(`Database connection error: ${testError.message}`);
+        }
+      }
+      
+      console.log('Step 5: Inserting appointment data...');
+      // Insert data into Supabase with timeout
+      const insertPromise = supabase
+        .from('appointments')
+        .insert([appointmentData])
+        .select()
+        .single();
+      
+      const insertTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database insertion timeout')), 15000)
+      );
+      
+      const { data, error: insertError } = await Promise.race([
+        insertPromise,
+        insertTimeoutPromise
+      ]) as any;
+      
+      if (insertError) {
+        console.error('Supabase insertion error:', insertError);
+        
+        // Handle specific error types
+        if (insertError.code === '42501') {
+          throw new Error('Permission denied. Please log in again.');
+        } else if (insertError.code === '23505') {
+          throw new Error('This appointment slot is already booked. Please choose another time.');
+        } else if (insertError.code === '23514') {
+          throw new Error('Invalid data provided. Please check your information.');
+        } else {
+          throw new Error(`Database error: ${insertError.message}`);
+        }
+      }
+      
+      console.log('Step 6: Appointment created successfully:', data);
+      setSuccess('আপনার অ্যাপয়েন্টমেন্ট সফলভাবে বুক করা হয়েছে!');
+      
+      setTimeout(() => {
+        navigate('/patient-portal', { 
+          state: { message: 'অ্যাপয়েন্টমেন্ট সফলভাবে বুক করা হয়েছে।' } 
+        });
+      }, 2000);
+      
+    } catch (err: any) {
+      console.error('=== Error in appointment submission ===');
+      console.error('Error details:', err);
+      
+      if (err.message.includes('timeout')) {
+        setError('সংযোগ সময় শেষ। অনুগ্রহ করে আবার চেষ্টা করুন।');
+      } else if (err.message.includes('violates row-level security policy') || err.code === '42501') {
+        setError('অনুমতি নেই। অ্যাপয়েন্টমেন্ট বুক করতে অনুগ্রহ করে আবার লগইন করুন।');
+        setTimeout(() => navigate('/login', { state: { returnTo: '/appointment' } }), 2000);
+      } else if (err.message.includes('You are not logged in')) {
+        setError(err.message);
+        setTimeout(() => navigate('/login', { state: { returnTo: '/appointment' } }), 2000);
+      } else if (err.message.includes('table does not exist')) {
+        setError('ডাটাবেস সেটআপ সমস্যা। অ্যাডমিনের সাথে যোগাযোগ করুন।');
+      } else {
+        setError(`অ্যাপয়েন্টমেন্ট বুক করতে সমস্যা হয়েছে: ${err.message}`);
+      }
+    } finally {
+      console.log('=== Appointment submission completed ===');
+      setLoading(false);
     }
   };
   
   const handlePrevious = () => {
-    if (step > 1) {
-      setStep(step - 1);
-    }
+    if (step > 1) setStep(step - 1);
   };
-  
-  useEffect(() => {
-    document.title = 'অ্যাপয়েন্টমেন্ট বুক করুন - স্বাস্থ্যসেবা ক্লিনিক';
-  }, []);
   
   return (
     <div className="pt-20 pb-16 bg-gray-50 min-h-screen">
@@ -99,250 +264,186 @@ const AppointmentPage: React.FC = () => {
         </div>
         
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          {/* Stepper UI */}
           <div className="p-4 bg-green-600 text-white">
             <div className="flex justify-between items-center">
-              <div className={`flex items-center ${step >= 1 ? 'text-white' : 'text-gray-300'}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step >= 1 ? 'bg-white text-green-600' : 'bg-gray-400'}`}>
-                  1
-                </div>
-                <span className="ml-2 font-medium">ডাক্তার নির্বাচন</span>
-              </div>
-              <div className="flex-1 mx-4 h-1 bg-gray-300">
-                <div className={`h-full bg-white transition-all ${step > 1 ? 'w-full' : 'w-0'}`}></div>
-              </div>
-              <div className={`flex items-center ${step >= 2 ? 'text-white' : 'text-gray-300'}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step >= 2 ? 'bg-white text-green-600' : 'bg-gray-400'}`}>
-                  2
-                </div>
-                <span className="ml-2 font-medium">সময় নির্ধারণ</span>
-              </div>
-              <div className="flex-1 mx-4 h-1 bg-gray-300">
-                <div className={`h-full bg-white transition-all ${step > 2 ? 'w-full' : 'w-0'}`}></div>
-              </div>
-              <div className={`flex items-center ${step >= 3 ? 'text-white' : 'text-gray-300'}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step >= 3 ? 'bg-white text-green-600' : 'bg-gray-400'}`}>
-                  3
-                </div>
-                <span className="ml-2 font-medium">তথ্য ও পেমেন্ট</span>
-              </div>
+              <div className={`flex items-center ${step >= 1 ? 'text-white' : 'text-gray-300'}`}><div className={`w-8 h-8 rounded-full flex items-center justify-center ${step >= 1 ? 'bg-white text-green-600' : 'bg-gray-400'}`}>1</div><span className="ml-2 font-medium">ডাক্তার নির্বাচন</span></div>
+              <div className="flex-1 mx-4 h-1 bg-gray-300"><div className={`h-full bg-white transition-all ${step > 1 ? 'w-full' : 'w-0'}`}></div></div>
+              <div className={`flex items-center ${step >= 2 ? 'text-white' : 'text-gray-300'}`}><div className={`w-8 h-8 rounded-full flex items-center justify-center ${step >= 2 ? 'bg-white text-green-600' : 'bg-gray-400'}`}>2</div><span className="ml-2 font-medium">সময় নির্ধারণ</span></div>
+              <div className="flex-1 mx-4 h-1 bg-gray-300"><div className={`h-full bg-white transition-all ${step > 2 ? 'w-full' : 'w-0'}`}></div></div>
+              <div className={`flex items-center ${step >= 3 ? 'text-white' : 'text-gray-300'}`}><div className={`w-8 h-8 rounded-full flex items-center justify-center ${step >= 3 ? 'bg-white text-green-600' : 'bg-gray-400'}`}>3</div><span className="ml-2 font-medium">প্রদত্ত তথ্য</span></div>
             </div>
           </div>
           
-          <form onSubmit={handleSubmit}>
+          {/* Form content */}
+          <div className="p-4">
             {step === 1 && (
-              <div className="p-6">
-                <h2 className="text-xl font-semibold mb-6">ডাক্তার নির্বাচন করুন</h2>
-                
-                <div className="mb-6">
-                  <label className="block text-gray-700 font-medium mb-2">বিভাগ</label>
-                  <select 
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              <div>
+                {/* Department selection */}
+                <div className="mb-4">
+                  <label htmlFor="department" className="block text-sm font-medium text-gray-700">ডাক্তার নির্বাচন</label>
+                  <select
+                    id="department"
+                    name="department"
                     value={selectedDepartment}
                     onChange={handleDepartmentChange}
-                    required
+                    className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   >
-                    <option value="">বিভাগ নির্বাচন করুন</option>
-                    {departments.map(dept => (
+                    <option value="">ডাক্তার নির্বাচন করুন</option>
+                    {departments.map((dept) => (
                       <option key={dept.id} value={dept.id}>{dept.name}</option>
                     ))}
                   </select>
                 </div>
-                
-                <div className="mb-6">
-                  <label className="block text-gray-700 font-medium mb-2">ডাক্তার</label>
-                  <select 
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+
+                {/* Doctor selection */}
+                <div className="mb-4">
+                  <label htmlFor="doctor" className="block text-sm font-medium text-gray-700">ডাক্তার নির্বাচন</label>
+                  <select
+                    id="doctor"
+                    name="doctor"
                     value={selectedDoctor}
                     onChange={(e) => setSelectedDoctor(e.target.value)}
-                    disabled={!selectedDepartment}
-                    required
+                    className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   >
                     <option value="">ডাক্তার নির্বাচন করুন</option>
-                    {selectedDepartment && doctors[selectedDepartment as keyof typeof doctors]?.map(doctor => (
-                      <option key={doctor.id} value={doctor.id}>{doctor.name}</option>
+                    {selectedDepartment && doctors[selectedDepartment].map((doc) => (
+                      <option key={doc.id} value={doc.id}>{doc.name}</option>
                     ))}
                   </select>
                 </div>
-                
-                <div className="flex justify-end">
-                  <Button 
-                    type="button"
-                    onClick={() => setStep(2)}
-                    disabled={!selectedDepartment || !selectedDoctor}
-                  >
-                    পরবর্তী
-                  </Button>
-                </div>
               </div>
             )}
-            
+
             {step === 2 && (
-              <div className="p-6">
-                <h2 className="text-xl font-semibold mb-6">সময় নির্ধারণ করুন</h2>
-                
-                <div className="mb-6">
-                  <label className="block text-gray-700 font-medium mb-2">
-                    <Calendar className="inline-block mr-2 h-5 w-5" />
-                    তারিখ
-                  </label>
-                  <input 
-                    type="date" 
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              <div>
+                {/* Date selection */}
+                <div className="mb-4">
+                  <label htmlFor="date" className="block text-sm font-medium text-gray-700">তারিখ নির্ধারণ</label>
+                  <input
+                    type="date"
+                    id="date"
+                    name="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
-                    required
+                    className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   />
                 </div>
-                
-                <div className="mb-6">
-                  <label className="block text-gray-700 font-medium mb-2">
-                    <Clock className="inline-block mr-2 h-5 w-5" />
-                    সময়
-                  </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {timeSlots.map((time) => (
-                      <button
-                        key={time}
-                        type="button"
-                        className={`py-2 px-1 text-sm border rounded-md focus:outline-none transition-colors ${
-                          selectedTime === time
-                            ? 'bg-green-600 text-white border-green-600'
-                            : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50'
-                        }`}
-                        onClick={() => setSelectedTime(time)}
-                      >
-                        {time}
-                      </button>
+
+                {/* Time selection */}
+                <div className="mb-4">
+                  <label htmlFor="time" className="block text-sm font-medium text-gray-700">সময় নির্ধারণ</label>
+                  <select
+                    id="time"
+                    name="time"
+                    value={selectedTime}
+                    onChange={(e) => setSelectedTime(e.target.value)}
+                    className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  >
+                    <option value="">সময় নির্ধারণ করুন</option>
+                    {timeSlots.map((slot) => (
+                      <option key={slot} value={slot}>{slot}</option>
                     ))}
-                  </div>
-                </div>
-                
-                <div className="flex justify-between">
-                  <Button 
-                    type="button"
-                    variant="outline"
-                    onClick={handlePrevious}
-                  >
-                    পূর্ববর্তী
-                  </Button>
-                  <Button 
-                    type="button"
-                    onClick={() => setStep(3)}
-                    disabled={!selectedDate || !selectedTime}
-                  >
-                    পরবর্তী
-                  </Button>
+                  </select>
                 </div>
               </div>
             )}
-            
+
             {step === 3 && (
-              <div className="p-6">
-                <h2 className="text-xl font-semibold mb-6">আপনার তথ্য এবং পেমেন্ট</h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  <div>
-                    <label className="block text-gray-700 font-medium mb-2">নাম</label>
-                    <input 
-                      type="text" 
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                      placeholder="আপনার পূর্ণ নাম"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-gray-700 font-medium mb-2">মোবাইল নাম্বার</label>
-                    <input 
-                      type="tel" 
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                      placeholder="০১৭XXXXXXXX"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-gray-700 font-medium mb-2">ইমেইল</label>
-                    <input 
-                      type="email" 
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                      placeholder="example@gmail.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-gray-700 font-medium mb-2">বয়স</label>
-                    <input 
-                      type="number" 
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                      placeholder="আপনার বয়স"
-                      required
-                    />
-                  </div>
-                </div>
-                
-                <div className="mb-6">
-                  <label className="block text-gray-700 font-medium mb-2">সমস্যার বিবরণ</label>
-                  <textarea 
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                    rows={3}
-                    placeholder="আপনার স্বাস্থ্য সমস্যার সংক্ষিপ্ত বিবরণ"
-                    required
+              <div>
+                {/* Patient information */}
+                <div className="mb-4">
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700">নাম</label>
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    value={patientInfo.name}
+                    onChange={handlePatientInfoChange}
+                    className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   />
                 </div>
-                
-                <div className="mb-6">
-                  <label className="block text-gray-700 font-medium mb-2">
-                    <CreditCard className="inline-block mr-2 h-5 w-5" />
-                    পেমেন্ট পদ্ধতি
-                  </label>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+
+                <div className="mb-4">
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700">ফোন নম্বর</label>
+                  <input
+                    type="text"
+                    id="phone"
+                    name="phone"
+                    value={patientInfo.phone}
+                    onChange={handlePatientInfoChange}
+                    className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">ইমেইল</label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={patientInfo.email}
+                    onChange={handlePatientInfoChange}
+                    className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label htmlFor="age" className="block text-sm font-medium text-gray-700">বয়স</label>
+                  <input
+                    type="text"
+                    id="age"
+                    name="age"
+                    value={patientInfo.age}
+                    onChange={handlePatientInfoChange}
+                    className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label htmlFor="healthIssues" className="block text-sm font-medium text-gray-700">সমস্যা</label>
+                  <textarea
+                    id="healthIssues"
+                    name="healthIssues"
+                    value={patientInfo.healthIssues}
+                    onChange={handlePatientInfoChange}
+                    className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  />
+                </div>
+
+                {/* Payment method selection */}
+                <div className="mb-4">
+                  <label htmlFor="payment" className="block text-sm font-medium text-gray-700">পেমেন্ট পদ্ধতি</label>
+                  <select
+                    id="payment"
+                    name="payment"
+                    value={selectedPayment}
+                    onChange={(e) => setSelectedPayment(e.target.value)}
+                    className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  >
+                    <option value="">পেমেন্ট পদ্ধতি নির্বাচন করুন</option>
                     {paymentMethods.map((method) => (
-                      <div 
-                        key={method.id}
-                        className={`border rounded-md p-3 cursor-pointer transition-all ${
-                          selectedPayment === method.id 
-                            ? 'border-green-600 bg-green-50' 
-                            : 'border-gray-300 hover:border-green-300'
-                        }`}
-                        onClick={() => setSelectedPayment(method.id)}
-                      >
-                        <div className="flex flex-col items-center">
-                          <img src={method.image} alt={method.name} className="h-8 mb-2" />
-                          <span className="text-sm text-center">{method.name}</span>
-                        </div>
-                      </div>
+                      <option key={method.id} value={method.id}>{method.name}</option>
                     ))}
-                  </div>
-                </div>
-                
-                <div className="bg-gray-50 p-4 mb-6 rounded-md">
-                  <h3 className="font-medium mb-2">অ্যাপয়েন্টমেন্ট সারাংশ</h3>
-                  <div className="text-sm text-gray-700">
-                    <p><span className="font-medium">বিভাগ:</span> {departments.find(d => d.id === selectedDepartment)?.name}</p>
-                    <p><span className="font-medium">ডাক্তার:</span> {doctors[selectedDepartment as keyof typeof doctors]?.find(d => d.id === selectedDoctor)?.name}</p>
-                    <p><span className="font-medium">তারিখ:</span> {selectedDate}</p>
-                    <p><span className="font-medium">সময়:</span> {selectedTime}</p>
-                    <p><span className="font-medium">ফি:</span> ৳ ৫০০</p>
-                  </div>
-                </div>
-                
-                <div className="flex justify-between">
-                  <Button 
-                    type="button"
-                    variant="outline"
-                    onClick={handlePrevious}
-                  >
-                    পূর্ববর্তী
-                  </Button>
-                  <Button 
-                    type="submit"
-                    disabled={!selectedPayment}
-                  >
-                    অ্যাপয়েন্টমেন্ট নিশ্চিত করুন
-                  </Button>
+                  </select>
                 </div>
               </div>
             )}
-          </form>
+          </div>
+          
+          {/* Form actions */}
+          <div className="p-4 bg-gray-100">
+            <div className="flex justify-between items-center">
+              {step > 1 && (
+                <Button onClick={handlePrevious}>পূর্ববর্তী</Button>
+              )}
+              {step < 3 ? (
+                <Button onClick={() => setStep(step + 1)}>পরবর্তী</Button>
+              ) : (
+                <Button onClick={handleSubmit}>বুক করুন</Button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
