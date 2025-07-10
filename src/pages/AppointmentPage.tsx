@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardHeader, CardContent } from '../components/ui/Card'; // Assuming you have these
-import Button from '../components/ui/Button'; // Assuming you have this
-import { Calendar, Clock, CreditCard } from 'lucide-react';
+import Button from '../components/ui/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
@@ -188,39 +186,56 @@ const AppointmentPage: React.FC = () => {
       }
       
       console.log('Step 5: Inserting appointment data...');
-      // Insert data into Supabase with timeout
-      const insertPromise = supabase
-        .from('appointments')
-        .insert([appointmentData])
-        .select()
-        .single();
-      
-      const insertTimeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database insertion timeout')), 15000)
-      );
-      
-      const { data, error: insertError } = await Promise.race([
-        insertPromise,
-        insertTimeoutPromise
-      ]) as any;
-      
-      if (insertError) {
-        console.error('Supabase insertion error:', insertError);
-        
-        // Handle specific error types
-        if (insertError.code === '42501') {
-          throw new Error('Permission denied. Please log in again.');
-        } else if (insertError.code === '23505') {
-          throw new Error('This appointment slot is already booked. Please choose another time.');
-        } else if (insertError.code === '23514') {
-          throw new Error('Invalid data provided. Please check your information.');
-        } else {
-          throw new Error(`Database error: ${insertError.message}`);
-        }
+
+      const response = await fetch('https://clinic-server-rho.vercel.app/api/pay',{
+        method :'POST',
+        headers: {
+           'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(appointmentData),
+      });
+
+      const data = await response.json();
+
+      if(response.ok && data.url){
+        window.location.href =  data.url;
+      } else {
+        throw new Error(data.error || 'Failed to initiate payment.');
       }
+
+      // Insert data into Supabase with timeout
+      // const insertPromise = supabase
+      //   .from('appointments')
+      //   .insert([appointmentData])
+      //   .select()
+      //   .single();
       
-      console.log('Step 6: Appointment created successfully:', data);
-      setSuccess('আপনার অ্যাপয়েন্টমেন্ট সফলভাবে বুক করা হয়েছে!');
+      // const insertTimeoutPromise = new Promise((_, reject) => 
+      //   setTimeout(() => reject(new Error('Database insertion timeout')), 15000)
+      // );
+      
+      // const { data, error: insertError } = await Promise.race([
+      //   insertPromise,
+      //   insertTimeoutPromise
+      // ]) as any;
+      
+      // if (insertError) {
+      //   console.error('Supabase insertion error:', insertError);
+        
+      //   // Handle specific error types
+      //   if (insertError.code === '42501') {
+      //     throw new Error('Permission denied. Please log in again.');
+      //   } else if (insertError.code === '23505') {
+      //     throw new Error('This appointment slot is already booked. Please choose another time.');
+      //   } else if (insertError.code === '23514') {
+      //     throw new Error('Invalid data provided. Please check your information.');
+      //   } else {
+      //     throw new Error(`Database error: ${insertError.message}`);
+      //   }
+      // }
+      
+      // console.log('Step 6: Appointment created successfully:', data);
+      // setSuccess('আপনার অ্যাপয়েন্টমেন্ট সফলভাবে বুক করা হয়েছে!');
       
       setTimeout(() => {
         navigate('/patient-portal', { 
