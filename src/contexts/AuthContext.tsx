@@ -30,7 +30,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [initialized, setInitialized] = useState(false);
 
   const refreshSession = async () => {
     try {
@@ -54,8 +53,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     let mounted = true;
 
-    // Get initial session
-    const getInitialSession = async () => {
+    // Get initial session immediately
+    const initializeAuth = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         
@@ -63,17 +62,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         if (error) {
           console.error('Error getting initial session:', error);
-        }
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // If user exists, ensure profile exists
-        if (session?.user) {
-          await ensureUserProfile(session.user);
+          setSession(null);
+          setUser(null);
+        } else {
+          setSession(session);
+          setUser(session?.user ?? null);
+          
+          // If user exists, ensure profile exists
+          if (session?.user) {
+            await ensureUserProfile(session.user);
+          }
         }
       } catch (error) {
-        console.error('Error in getInitialSession:', error);
+        console.error('Error in initializeAuth:', error);
         if (mounted) {
           setSession(null);
           setUser(null);
@@ -81,12 +82,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } finally {
         if (mounted) {
           setLoading(false);
-          setInitialized(true);
         }
       }
     };
 
-    getInitialSession();
+    initializeAuth();
 
     // Listen for auth changes
     const {
@@ -94,26 +94,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
-      console.log('Auth state changed:', event);
+      console.log('Auth state changed:', event, session?.user?.id);
       
       setSession(session);
       setUser(session?.user ?? null);
       
-      // Only set loading to false if we haven't initialized yet
-      if (!initialized) {
-        setLoading(false);
-        setInitialized(true);
-      }
-
       // Handle specific events
       if (event === 'SIGNED_IN' && session?.user) {
         await ensureUserProfile(session.user);
       }
+      
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
+      }
+      
+      // Ensure loading is false after any auth state change
+      setLoading(false);
     });
 
     // Handle visibility change to refresh session when tab becomes active
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && initialized && !loading) {
+      if (document.visibilityState === 'visible' && !loading) {
         refreshSession();
       }
     };
@@ -125,7 +127,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       subscription.unsubscribe();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [initialized, loading]);
+  }, []);
 
   const ensureUserProfile = async (user: User) => {
     try {
@@ -200,13 +202,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signOut = async () => {
     try {
+      setLoading(true);
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Error signing out:', error);
+        throw error;
       }
-      // The auth state change listener will handle clearing the state
+      
+      // Clear state immediately
+      setSession(null);
+      setUser(null);
+      
+      // Force a page reload to clear any cached state
+      window.location.href = '/';
     } catch (error) {
       console.error('Error in signOut:', error);
+      // Even if there's an error, clear the local state
+      setSession(null);
+      setUser(null);
+      window.location.href = '/';
+    } finally {
+      setLoading(false);
     }
   };
 

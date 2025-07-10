@@ -7,6 +7,7 @@ const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const location = useLocation();
   const { user, signOut, loading } = useAuth();
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -14,11 +15,18 @@ const Navbar: React.FC = () => {
   const toggleMenu = () => setIsOpen(!isOpen);
   
   const handleLogout = async () => {
+    if (isLoggingOut) return;
+    
     try {
+      setIsLoggingOut(true);
       setShowUserMenu(false);
       await signOut();
     } catch (error) {
       console.error('Logout error:', error);
+      // Force logout even if there's an error
+      window.location.href = '/';
+    } finally {
+      setIsLoggingOut(false);
     }
   };
   
@@ -94,6 +102,7 @@ const Navbar: React.FC = () => {
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex items-center text-gray-800 hover:text-green-600 px-3 py-2 text-sm font-medium"
+                  disabled={isLoggingOut}
                 >
                   <UserCircle className="mr-1 h-5 w-5" />
                   <span className="max-w-32 truncate">
@@ -118,10 +127,11 @@ const Navbar: React.FC = () => {
                     </Link>
                     <button
                       onClick={handleLogout}
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                      disabled={isLoggingOut}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center disabled:opacity-50"
                     >
                       <LogOut className="mr-2 h-4 w-4" />
-                      লগআউট
+                      {isLoggingOut ? 'লগআউট হচ্ছে...' : 'লগআউট'}
                     </button>
                   </div>
                 )}
@@ -174,10 +184,11 @@ const Navbar: React.FC = () => {
               </div>
               <button
                 onClick={handleLogout}
-                className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-800 hover:text-green-600 flex items-center"
+                disabled={isLoggingOut}
+                className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-800 hover:text-green-600 flex items-center disabled:opacity-50"
               >
                 <LogOut className="mr-2 h-5 w-5" />
-                লগআউট
+                {isLoggingOut ? 'লগআউট হচ্ছে...' : 'লগআউট'}
               </button>
             </>
           )}
