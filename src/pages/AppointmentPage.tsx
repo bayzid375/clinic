@@ -157,34 +157,6 @@ const AppointmentPage: React.FC = () => {
       };
       
       console.log('Appointment data to submit:', appointmentData);
-
-      //console.log('Step 4: Testing Supabase connection...');
-      // // Test the connection first with timeout
-      // const testPromise = supabase
-      //   .from('appointments')
-      //   .select('id')
-      //   .limit(1);
-      
-      // const testTimeoutPromise = new Promise((_, reject) => 
-      //   setTimeout(() => reject(new Error('Database connection timeout')), 10000)
-      // );
-      
-      // const { data: testData, error: testError } = await Promise.race([
-      //   testPromise,
-      //   testTimeoutPromise
-      // ]) as any;
-      
-      // if (testError) {
-      //   console.error('Supabase connection test failed:', testError);
-      //   if (testError.code === 'PGRST116') {
-      //     throw new Error('Appointments table does not exist. Please contact administrator.');
-      //   } else if (testError.code === '42501') {
-      //     throw new Error('Permission denied. Please log in again.');
-      //   } else {
-      //     throw new Error(`Database connection error: ${testError.message}`);
-      //   }
-      // }
-      
       console.log('Step 5: Inserting appointment data...');
 
       const response = await fetch('https://clinic-server-rho.vercel.app/api/pay',{
@@ -202,40 +174,6 @@ const AppointmentPage: React.FC = () => {
       } else {
         throw new Error(data.error || 'Failed to initiate payment.');
       }
-
-      // Insert data into Supabase with timeout
-      // const insertPromise = supabase
-      //   .from('appointments')
-      //   .insert([appointmentData])
-      //   .select()
-      //   .single();
-      
-      // const insertTimeoutPromise = new Promise((_, reject) => 
-      //   setTimeout(() => reject(new Error('Database insertion timeout')), 15000)
-      // );
-      
-      // const { data, error: insertError } = await Promise.race([
-      //   insertPromise,
-      //   insertTimeoutPromise
-      // ]) as any;
-      
-      // if (insertError) {
-      //   console.error('Supabase insertion error:', insertError);
-        
-      //   // Handle specific error types
-      //   if (insertError.code === '42501') {
-      //     throw new Error('Permission denied. Please log in again.');
-      //   } else if (insertError.code === '23505') {
-      //     throw new Error('This appointment slot is already booked. Please choose another time.');
-      //   } else if (insertError.code === '23514') {
-      //     throw new Error('Invalid data provided. Please check your information.');
-      //   } else {
-      //     throw new Error(`Database error: ${insertError.message}`);
-      //   }
-      // }
-      
-      // console.log('Step 6: Appointment created successfully:', data);
-      // setSuccess('আপনার অ্যাপয়েন্টমেন্ট সফলভাবে বুক করা হয়েছে!');
       
       setTimeout(() => {
         navigate('/patient-portal', { 

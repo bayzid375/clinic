@@ -16,6 +16,12 @@ const LoginPage = React.lazy(() => import('./pages/LoginPage'));
 const RegisterPage = React.lazy(() => import('./pages/RegisterPage'));
 const OTPVerificationPage = React.lazy(() => import('./pages/OTPVerificationPage'));
 
+// --- NEWLY ADDED PAYMENT PAGES ---
+const PaymentSuccessPage = React.lazy(() => import('./pages/PaymentSuccessPage'));
+const PaymentFailPage = React.lazy(() => import('./pages/PaymentFailPage'));
+const PaymentCancelPage = React.lazy(() => import('./pages/PaymentCancelPage'));
+
+
 function App() {
   return (
     <AuthProvider>
@@ -67,6 +73,12 @@ function App() {
               <Route path="login" element={<LoginPage />} />
               <Route path="register" element={<RegisterPage />} />
               <Route path="verify-otp" element={<OTPVerificationPage />} />
+
+              {/* --- NEW ROUTES FOR PAYMENT STATUS --- */}
+              <Route path="payment-success" element={<PaymentSuccessPage />} />
+              <Route path="payment-fail" element={<PaymentFailPage />} />
+              <Route path="payment-cancel" element={<PaymentCancelPage />} />
+
             </Route>
           </Routes>
         </Suspense>
