@@ -158,32 +158,32 @@ const AppointmentPage: React.FC = () => {
       
       console.log('Appointment data to submit:', appointmentData);
 
-      console.log('Step 4: Testing Supabase connection...');
-      // Test the connection first with timeout
-      const testPromise = supabase
-        .from('appointments')
-        .select('id')
-        .limit(1);
+      //console.log('Step 4: Testing Supabase connection...');
+      // // Test the connection first with timeout
+      // const testPromise = supabase
+      //   .from('appointments')
+      //   .select('id')
+      //   .limit(1);
       
-      const testTimeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database connection timeout')), 10000)
-      );
+      // const testTimeoutPromise = new Promise((_, reject) => 
+      //   setTimeout(() => reject(new Error('Database connection timeout')), 10000)
+      // );
       
-      const { data: testData, error: testError } = await Promise.race([
-        testPromise,
-        testTimeoutPromise
-      ]) as any;
+      // const { data: testData, error: testError } = await Promise.race([
+      //   testPromise,
+      //   testTimeoutPromise
+      // ]) as any;
       
-      if (testError) {
-        console.error('Supabase connection test failed:', testError);
-        if (testError.code === 'PGRST116') {
-          throw new Error('Appointments table does not exist. Please contact administrator.');
-        } else if (testError.code === '42501') {
-          throw new Error('Permission denied. Please log in again.');
-        } else {
-          throw new Error(`Database connection error: ${testError.message}`);
-        }
-      }
+      // if (testError) {
+      //   console.error('Supabase connection test failed:', testError);
+      //   if (testError.code === 'PGRST116') {
+      //     throw new Error('Appointments table does not exist. Please contact administrator.');
+      //   } else if (testError.code === '42501') {
+      //     throw new Error('Permission denied. Please log in again.');
+      //   } else {
+      //     throw new Error(`Database connection error: ${testError.message}`);
+      //   }
+      // }
       
       console.log('Step 5: Inserting appointment data...');
 
