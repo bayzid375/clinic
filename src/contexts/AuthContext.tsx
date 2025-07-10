@@ -56,22 +56,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Get initial session immediately
     const initializeAuth = async () => {
       try {
+        setLoading(true);
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (!mounted) return;
         
         if (error) {
           console.error('Error getting initial session:', error);
-          setSession(null);
-          setUser(null);
-        } else {
-          setSession(session);
-          setUser(session?.user ?? null);
-          
-          // If user exists, ensure profile exists
-          if (session?.user) {
-            await ensureUserProfile(session.user);
-          }
+        }
+        
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // If user exists, ensure profile exists
+        if (session?.user) {
+          await ensureUserProfile(session.user);
         }
       } catch (error) {
         console.error('Error in initializeAuth:', error);
@@ -99,18 +98,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setSession(session);
       setUser(session?.user ?? null);
       
+      // Only set loading to false if we haven't initialized yet
+      if (!initialized) {
+        setLoading(false);
+        setInitialized(true);
+      }
+
       // Handle specific events
       if (event === 'SIGNED_IN' && session?.user) {
         await ensureUserProfile(session.user);
       }
-      
-      if (event === 'SIGNED_OUT') {
-        setSession(null);
-        setUser(null);
-      }
-      
-      // Ensure loading is false after any auth state change
-      setLoading(false);
     });
 
     // Handle visibility change to refresh session when tab becomes active
@@ -217,12 +214,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       window.location.href = '/';
     } catch (error) {
       console.error('Error in signOut:', error);
-      // Even if there's an error, clear the local state
-      setSession(null);
-      setUser(null);
-      window.location.href = '/';
-    } finally {
-      setLoading(false);
     }
   };
 

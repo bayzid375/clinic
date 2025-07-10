@@ -16,7 +16,7 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   
-  // Redirect if user is already logged in (only after loading is complete)
+  // Redirect if user is already logged in
   useEffect(() => {
     if (!loading && user) {
       const returnTo = location.state?.from?.pathname || '/patient-portal';
@@ -69,13 +69,13 @@ const LoginPage: React.FC = () => {
     document.title = 'লগইন - স্বাস্থ্যসেবা ক্লিনিক';
   }, []);
 
-  // Show loading spinner only while checking authentication (not during form submission)
+  // Show loading spinner while checking authentication
   if (loading) {
     return (
       <div className="pt-20 pb-16 min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">যাচাই করা হচ্ছে...</p>
+          <p className="mt-4 text-gray-600">লোড হচ্ছে...</p>
         </div>
       </div>
     );
