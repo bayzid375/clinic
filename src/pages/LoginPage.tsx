@@ -8,29 +8,30 @@ import { useAuth } from '../contexts/AuthContext';
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, user } = useAuth();
+  const { signIn, user, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [userType, setUserType] = useState('patient');
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   
-  // Redirect if user is already logged in
+  // Redirect if user is already logged in (only after loading is complete)
   useEffect(() => {
-    if (user) {
-      navigate('/patient-portal');
+    if (!loading && user) {
+      const returnTo = location.state?.from?.pathname || '/patient-portal';
+      navigate(returnTo, { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, loading, navigate, location.state]);
 
   // Show success message if redirected from OTP verification
   useEffect(() => {
     if (location.state?.message) {
       setSuccess(location.state.message);
       // Clear the state to prevent showing message on refresh
-      navigate(location.pathname, { replace: true });
+      window.history.replaceState({}, document.title);
     }
-  }, [location.state, navigate, location.pathname]);
+  }, [location.state]);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +41,7 @@ const LoginPage: React.FC = () => {
       return;
     }
     
-    setLoading(true);
+    setIsSubmitting(true);
     setError('');
     setSuccess('');
     
@@ -55,20 +56,30 @@ const LoginPage: React.FC = () => {
         } else {
           setError('লগইনে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
         }
-      } else {
-        // Successful login - user will be redirected by useEffect
-        console.log('Login successful');
       }
+      // Success case is handled by the useEffect above
     } catch (err) {
       setError('একটি অপ্রত্যাশিত ত্রুটি ঘটেছে। আবার চেষ্টা করুন।');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
   
   useEffect(() => {
     document.title = 'লগইন - স্বাস্থ্যসেবা ক্লিনিক';
   }, []);
+
+  // Show loading spinner only while checking authentication (not during form submission)
+  if (loading) {
+    return (
+      <div className="pt-20 pb-16 min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">যাচাই করা হচ্ছে...</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="pt-20 pb-16 min-h-screen flex items-center justify-center bg-gray-50">
@@ -100,7 +111,7 @@ const LoginPage: React.FC = () => {
                     userType === 'patient' ? 'bg-white shadow-sm' : 'text-gray-700 hover:bg-gray-100'
                   }`}
                   onClick={() => setUserType('patient')}
-                  disabled={loading}
+                  disabled={isSubmitting}
                 >
                   রোগী
                 </button>
@@ -110,7 +121,7 @@ const LoginPage: React.FC = () => {
                     userType === 'doctor' ? 'bg-white shadow-sm' : 'text-gray-700 hover:bg-gray-100'
                   }`}
                   onClick={() => setUserType('doctor')}
-                  disabled={loading}
+                  disabled={isSubmitting}
                 >
                   ডাক্তার
                 </button>
@@ -120,7 +131,7 @@ const LoginPage: React.FC = () => {
                     userType === 'admin' ? 'bg-white shadow-sm' : 'text-gray-700 hover:bg-gray-100'
                   }`}
                   onClick={() => setUserType('admin')}
-                  disabled={loading}
+                  disabled={isSubmitting}
                 >
                   অ্যাডমিন
                 </button>
@@ -142,7 +153,7 @@ const LoginPage: React.FC = () => {
                     setEmail(e.target.value);
                     if (error) setError('');
                   }}
-                  disabled={loading}
+                  disabled={isSubmitting}
                   required
                 />
               </div>
@@ -161,7 +172,7 @@ const LoginPage: React.FC = () => {
                     setPassword(e.target.value);
                     if (error) setError('');
                   }}
-                  disabled={loading}
+                  disabled={isSubmitting}
                   required
                 />
               </div>
@@ -172,7 +183,7 @@ const LoginPage: React.FC = () => {
                     type="checkbox" 
                     id="remember" 
                     className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                    disabled={loading}
+                    disabled={isSubmitting}
                   />
                   <label htmlFor="remember" className="ml-2 block text-sm text-gray-700">
                     মনে রাখুন
@@ -187,10 +198,10 @@ const LoginPage: React.FC = () => {
               <Button 
                 type="submit" 
                 fullWidth 
-                disabled={loading}
-                icon={loading ? undefined : <LogIn className="h-5 w-5" />}
+                disabled={isSubmitting}
+                icon={isSubmitting ? undefined : <LogIn className="h-5 w-5" />}
               >
-                {loading ? 'লগইন হচ্ছে...' : 'লগইন করুন'}
+                {isSubmitting ? 'লগইন হচ্ছে...' : 'লগইন করুন'}
               </Button>
             </form>
           </CardContent>
