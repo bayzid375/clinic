@@ -30,6 +30,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
   const refreshSession = async () => {
     try {
@@ -56,23 +57,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Get initial session
     const getInitialSession = async () => {
       try {
-        setLoading(true);
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (!mounted) return;
         
         if (error) {
           console.error('Error getting initial session:', error);
-          setSession(null);
-          setUser(null);
-        } else {
-          setSession(session);
-          setUser(session?.user ?? null);
-          
-          // If user exists but no profile, create it
-          if (session?.user && !error) {
-            await ensureUserProfile(session.user);
-          }
+        }
+        
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // If user exists, ensure profile exists
+        if (session?.user) {
+          await ensureUserProfile(session.user);
         }
       } catch (error) {
         console.error('Error in getInitialSession:', error);
@@ -83,6 +81,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } finally {
         if (mounted) {
           setLoading(false);
+          setInitialized(true);
         }
       }
     };
@@ -95,30 +94,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
-      console.log('Auth state changed:', event, session?.user?.id);
+      console.log('Auth state changed:', event);
       
       setSession(session);
       setUser(session?.user ?? null);
       
-      // Only set loading to false after we've processed the auth change
-      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+      // Only set loading to false if we haven't initialized yet
+      if (!initialized) {
         setLoading(false);
+        setInitialized(true);
       }
 
       // Handle specific events
       if (event === 'SIGNED_IN' && session?.user) {
         await ensureUserProfile(session.user);
       }
-      
-      if (event === 'SIGNED_OUT') {
-        setSession(null);
-        setUser(null);
-      }
     });
 
     // Handle visibility change to refresh session when tab becomes active
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && !loading) {
+      if (document.visibilityState === 'visible' && initialized && !loading) {
         refreshSession();
       }
     };
@@ -130,7 +125,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       subscription.unsubscribe();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [initialized, loading]);
 
   const ensureUserProfile = async (user: User) => {
     try {
@@ -205,7 +200,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signOut = async () => {
     try {
-      setLoading(true);
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Error signing out:', error);
@@ -213,8 +207,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // The auth state change listener will handle clearing the state
     } catch (error) {
       console.error('Error in signOut:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
