@@ -36,7 +36,7 @@ interface UserProfile {
 
 const PatientPortal: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -45,24 +45,31 @@ const PatientPortal: React.FC = () => {
   
   useEffect(() => {
     document.title = 'রোগী পোর্টাল - স্বাস্থ্যসেবা ক্লিনিক';
-    
-    if (!user) {
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
       navigate('/login');
       return;
     }
     
-    fetchUserData();
-  }, [user, navigate]);
+    if (!authLoading && user) {
+      fetchUserData();
+    }
+  }, [user, authLoading, navigate]);
 
   const fetchUserData = async () => {
+    if (!user) return;
+    
     try {
       setLoading(true);
+      setError('');
       
       // Fetch user profile
       const { data: profileData, error: profileError } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('id', user?.id)
+        .eq('id', user.id)
         .single();
       
       if (profileError && profileError.code !== 'PGRST116') {
@@ -75,7 +82,7 @@ const PatientPortal: React.FC = () => {
       const { data: appointmentsData, error: appointmentsError } = await supabase
         .from('appointments')
         .select('*')
-        .eq('patient_id', user?.id)
+        .eq('patient_id', user.id)
         .order('appointment_date', { ascending: true });
       
       if (appointmentsError) {
@@ -159,7 +166,8 @@ const PatientPortal: React.FC = () => {
     return colorMap[status] || 'bg-gray-100 text-gray-800';
   };
 
-  if (loading) {
+  // Show loading spinner while checking authentication or loading data
+  if (authLoading || loading) {
     return (
       <div className="pt-20 pb-16 bg-gray-50 min-h-screen flex items-center justify-center">
         <div className="text-center">

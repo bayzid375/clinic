@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ChevronDown, UserCircle, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,14 +8,15 @@ const Navbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading } = useAuth();
+  const userMenuRef = useRef<HTMLDivElement>(null);
   
   const toggleMenu = () => setIsOpen(!isOpen);
   
   const handleLogout = async () => {
     try {
-      await signOut();
       setShowUserMenu(false);
+      await signOut();
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -37,19 +38,20 @@ const Navbar: React.FC = () => {
   // Close mobile menu when route changes
   useEffect(() => {
     setIsOpen(false);
+    setShowUserMenu(false);
   }, [location.pathname]);
   
   // Close user menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (showUserMenu) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setShowUserMenu(false);
       }
     };
     
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [showUserMenu]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   
   return (
     <nav className={`fixed w-full z-50 transition-all duration-300 ${
@@ -68,7 +70,7 @@ const Navbar: React.FC = () => {
             <Link to="/" className="text-gray-800 hover:text-green-600 px-3 py-2 text-sm font-medium">
               হোম
             </Link>
-            {user && (
+            {user && !loading && (
               <>
                 <Link to="/patient-portal" className="text-gray-800 hover:text-green-600 px-3 py-2 text-sm font-medium">
                   রোগী পোর্টাল
@@ -87,22 +89,24 @@ const Navbar: React.FC = () => {
           </div>
           
           <div className="hidden md:flex items-center">
-            {user ? (
-              <div className="relative">
+            {!loading && user ? (
+              <div className="relative" ref={userMenuRef}>
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex items-center text-gray-800 hover:text-green-600 px-3 py-2 text-sm font-medium"
                 >
                   <UserCircle className="mr-1 h-5 w-5" />
-                  {user.user_metadata?.full_name || user.email}
+                  <span className="max-w-32 truncate">
+                    {user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'}
+                  </span>
                   <ChevronDown className="ml-1 h-4 w-4" />
                 </button>
                 
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border">
                     <div className="px-4 py-2 text-sm text-gray-700 border-b">
-                      <p className="font-medium">{user.user_metadata?.full_name || 'User'}</p>
-                      <p className="text-gray-500">{user.email}</p>
+                      <p className="font-medium truncate">{user.user_metadata?.full_name || 'User'}</p>
+                      <p className="text-gray-500 truncate">{user.email}</p>
                     </div>
                     <Link
                       to="/patient-portal"
@@ -111,14 +115,6 @@ const Navbar: React.FC = () => {
                     >
                       <UserCircle className="mr-2 h-4 w-4" />
                       প্রোফাইল
-                    </Link>
-                    <Link
-                      to="/settings"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      <Settings className="mr-2 h-4 w-4" />
-                      সেটিংস
                     </Link>
                     <button
                       onClick={handleLogout}
@@ -130,11 +126,15 @@ const Navbar: React.FC = () => {
                   </div>
                 )}
               </div>
-            ) : (
+            ) : !loading ? (
               <Link to="/login" className="text-gray-800 hover:text-green-600 px-3 py-2 text-sm font-medium flex items-center">
                 <UserCircle className="mr-1 h-5 w-5" />
                 লগইন
               </Link>
+            ) : (
+              <div className="px-3 py-2">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600"></div>
+              </div>
             )}
           </div>
           
@@ -157,7 +157,7 @@ const Navbar: React.FC = () => {
           <Link to="/" className="block px-3 py-2 rounded-md text-base font-medium text-gray-800 hover:text-green-600">
             হোম
           </Link>
-          {user && (
+          {!loading && user && (
             <>
               <Link to="/patient-portal" className="block px-3 py-2 rounded-md text-base font-medium text-gray-800 hover:text-green-600">
                 রোগী পোর্টাল
@@ -169,8 +169,8 @@ const Navbar: React.FC = () => {
                 ফার্মেসি ও ল্যাব
               </Link>
               <div className="px-3 py-2 border-t border-gray-200">
-                <p className="text-sm text-gray-600">{user.user_metadata?.full_name || 'User'}</p>
-                <p className="text-xs text-gray-500">{user.email}</p>
+                <p className="text-sm text-gray-600 truncate">{user.user_metadata?.full_name || 'User'}</p>
+                <p className="text-xs text-gray-500 truncate">{user.email}</p>
               </div>
               <button
                 onClick={handleLogout}
@@ -184,7 +184,7 @@ const Navbar: React.FC = () => {
           <Link to="/appointment" className="block px-3 py-2 rounded-md text-base font-medium bg-green-600 text-white hover:bg-green-700">
             অ্যাপয়েন্টমেন্ট বুক করুন
           </Link>
-          {!user && (
+          {!loading && !user && (
             <Link to="/login" className="block px-3 py-2 rounded-md text-base font-medium text-gray-800 hover:text-green-600 flex items-center">
               <UserCircle className="mr-1 h-5 w-5" />
               লগইন

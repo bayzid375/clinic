@@ -12,24 +12,25 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
   const { user, loading } = useAuth();
   const location = useLocation();
 
+  // Show loading spinner while checking authentication
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">লোড হচ্ছে...</p>
+        </div>
       </div>
     );
   }
 
+  // Redirect to login if not authenticated
   if (!user) {
-    // Redirect to login page with return url
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If role is required, check user role
+  // Check role if required
   if (requiredRole) {
-    // You can implement role checking logic here
-    // For now, we'll just check if user exists
-    // In a real app, you'd check user metadata or a separate roles table
     const userRole = user.user_metadata?.role || 'patient';
     
     if (userRole !== requiredRole) {
@@ -48,4 +49,4 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
   return <>{children}</>;
 };
 
-export default ProtectedRoute; 
+export default ProtectedRoute;

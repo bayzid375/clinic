@@ -7,15 +7,21 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-// Create Supabase client with debug enabled
+// Create Supabase client with optimized settings
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    flowType: 'pkce'
   },
   db: {
     schema: 'public'
+  },
+  global: {
+    headers: {
+      'x-my-custom-header': 'clinic-app'
+    }
   }
 });
 
@@ -98,4 +104,4 @@ export interface UserRegistrationData {
 
 export interface AuthError {
   message: string;
-} 
+}

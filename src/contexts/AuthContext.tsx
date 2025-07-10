@@ -33,67 +33,92 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshSession = async () => {
     try {
-      setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setUser(session?.user ?? null);
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Error getting session:', error);
+        setSession(null);
+        setUser(null);
+      } else {
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
     } catch (error) {
       console.error('Error refreshing session:', error);
-    } finally {
-      setLoading(false);
+      setSession(null);
+      setUser(null);
     }
   };
 
   useEffect(() => {
+    let mounted = true;
+
     // Get initial session
-    refreshSession();
+    const getInitialSession = async () => {
+      try {
+        setLoading(true);
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+        
+        if (error) {
+          console.error('Error getting initial session:', error);
+          setSession(null);
+          setUser(null);
+        } else {
+          setSession(session);
+          setUser(session?.user ?? null);
+          
+          // If user exists but no profile, create it
+          if (session?.user && !error) {
+            await ensureUserProfile(session.user);
+          }
+        }
+      } catch (error) {
+        console.error('Error in getInitialSession:', error);
+        if (mounted) {
+          setSession(null);
+          setUser(null);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    getInitialSession();
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
+      console.log('Auth state changed:', event, session?.user?.id);
+      
       setSession(session);
       setUser(session?.user ?? null);
-      setLoading(false);
+      
+      // Only set loading to false after we've processed the auth change
+      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+        setLoading(false);
+      }
 
-      // Handle email confirmation
+      // Handle specific events
       if (event === 'SIGNED_IN' && session?.user) {
-        // Check if user profile exists, if not create it
-        const { data: existingProfile } = await supabase
-          .from('user_profiles')
-          .select('id')
-          .eq('id', session.user.id)
-          .single();
-
-        if (!existingProfile) {
-          // Create user profile from metadata
-          const userData = session.user.user_metadata;
-          if (userData) {
-            const { error: profileError } = await supabase
-              .from('user_profiles')
-              .insert([
-                {
-                  id: session.user.id,
-                  full_name: userData.full_name,
-                  email: session.user.email,
-                  phone: userData.phone,
-                  gender: userData.gender,
-                  age: parseInt(userData.age),
-                  created_at: new Date().toISOString(),
-                },
-              ]);
-
-            if (profileError) {
-              console.error('Error creating user profile:', profileError);
-            }
-          }
-        }
+        await ensureUserProfile(session.user);
+      }
+      
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
       }
     });
 
-    // Handle visibility change
+    // Handle visibility change to refresh session when tab becomes active
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && !loading) {
         refreshSession();
       }
     };
@@ -101,39 +126,96 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
-  const signUp = async (email: string, password: string, userData: any) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: userData.name,
-          phone: userData.phone,
-          gender: userData.gender,
-          age: userData.age,
-        },
-        emailRedirectTo: `${window.location.origin}/login`,
-      },
-    });
+  const ensureUserProfile = async (user: User) => {
+    try {
+      // Check if user profile exists
+      const { data: existingProfile, error: fetchError } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('id', user.id)
+        .single();
 
-    return { error, data };
+      if (fetchError && fetchError.code === 'PGRST116') {
+        // Profile doesn't exist, create it
+        const userData = user.user_metadata;
+        if (userData) {
+          const { error: insertError } = await supabase
+            .from('user_profiles')
+            .insert([
+              {
+                id: user.id,
+                full_name: userData.full_name || '',
+                email: user.email || '',
+                phone: userData.phone || '',
+                gender: userData.gender || '',
+                age: userData.age ? parseInt(userData.age) : null,
+                created_at: new Date().toISOString(),
+              },
+            ]);
+
+          if (insertError) {
+            console.error('Error creating user profile:', insertError);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error ensuring user profile:', error);
+    }
+  };
+
+  const signUp = async (email: string, password: string, userData: any) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: userData.name,
+            phone: userData.phone,
+            gender: userData.gender,
+            age: userData.age,
+          },
+          emailRedirectTo: `${window.location.origin}/login`,
+        },
+      });
+
+      return { error, data };
+    } catch (error) {
+      return { error };
+    }
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      return { error };
+    } catch (error) {
+      return { error };
+    }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Error signing out:', error);
+      }
+      // The auth state change listener will handle clearing the state
+    } catch (error) {
+      console.error('Error in signOut:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const value = {
@@ -147,4 +229,4 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}; 
+};
